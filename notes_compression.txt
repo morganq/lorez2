@@ -1,0 +1,24 @@
+14828
+14413 (no paths)
+12046 (barely any models)
+13482 (no level models)
+
+11460 (no level models)
+
+
+1346 = current level compressed chars
+
+
+
+13684
+13638
+13420
+15616
+
+2196
+
+
+current = 1960
+ideal = 1380 per level
+
+12781
