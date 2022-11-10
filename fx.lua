@@ -1,43 +1,27 @@
---[[explosion_colors = split"7,7,10,8,6,5"
-function make_explosion(pt)
-    local time,bs = 0,rnd(2) + 1
-    add(sprites, sprite(pt, function(self, x, y, size)
-        time += 1
-        circfill(x, y, size * max(7 - time / 3, 0) * bs, explosion_colors[min(time \ 4 + 1, 6)])
-        if time > 20 then
-            del(sprites, self)
-        end
-    end))
-end
-]]
-num_splashes = 4
+-- Contains the "splash" effect when you destroy an entity
+
 function make_splash(pt)
     local time = 0
-    num_splashes += 1
+    local f1, f2 = rnd(1) > 0.5, rnd(1) > 0.5
+    local s1, s2 = rnd(1)/4 + 0.25, rnd(1)/4 + 0.25
     add(sprites, sprite(pt, function(self, x, y, size)
-        pal(split"1,2,3,4,3,10,7,8,9,10,11,12,11,14,15")
+        pal(split"0,0,0,0,9,0,0,0,0,0,0,0,10,0,0")
         time += 1.3
-        
+        s1 *= 1.025
+        s2 *= 1.025
+        fillp(pat[mid(smooth(time/30, 0.5) * 14 \ 1 + 1,1,16)] | 0b0.111)
         self.background = true
-        
-        x2 = x \ 8 * 8
-        y2 = y \ 8 * 8
-        size = mid(size * 2, 0.35, 1.25)
-        local rad = 96 / num_splashes
-        local s1 = 16 * size
-        local sv = sin(time / 20) * 13.5 / size
-        for ix = x2 - rad, x2 + rad, 8 do
-            for iy = y2 - rad, y2 + rad, 8 do
-                local dx, dy = (ix - x) / rad, (iy - y) / rad
-                spr(mid(sv * (1-sqrt(dx ^ 2 + dy ^ 2)) + 1,1,11)\1, ix, iy)
-            end
-        end
-        
+        local v1 = (size + 0.2) * 30
+        local v2 = v1 * 2
+        sspr(96, 32, 32, 32, x-v1*s1, y-v1*s2, v2*s1, v2*s2, f1, f2)
+
         pal()
-        circ(x, y, (size * 20) + 20 - time * 2, 11)
+        if time < 20 then
+            fillp()
+            circ(x, y, size * (smooth(time / 40 + 0.5) * 190 - 100), 7)
+        end
         if time > 60 then
             del(sprites, self)
-            num_splashes -= 1
         end
     end))
 end

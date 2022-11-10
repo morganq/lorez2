@@ -45,6 +45,66 @@ function make_sculpture(callback, max_p, max_f)
     return m
 end
 
+function make_models_sculpture(def)
+    local next_z = camera.pos[3]
+    local x = 1
+    local model = deserialize_model(data_models[split(def)[3]], 1, v_zero())
+    local tris_needed, fills_needed, co = {}, {}, 1
+    function callback(s)
+        if framenum % 2 == 0 then
+            if #tris_needed > 0 then
+                local points, normal, color, fill = unpack(tris_needed[1])
+                add(fills_needed, {framenum + 5, s.fn, color, fill})
+                s.add_poly(points, normal, 7, 0b0.01)
+                deli(tris_needed, 1)
+            end
+        end
+        if #fills_needed > 0 then
+            local time, index, color, fill = unpack(fills_needed[1])
+            if framenum > time then
+                local t =s.m.triangles[index]
+                t.color = color
+                t.fill = fill
+                deli(fills_needed, 1)
+            end
+        end
+
+        if beat_ticks_8 == 0 and #s.m.triangles > 0 then
+            for i = 1, 2 do
+                local ind = rnd(#s.m.triangles)\1 + 1
+                add(fills_needed, {framenum + 5, ind, -1, 0b0.01})
+                s.m.triangles[ind].color = -0x19
+            end
+        end
+
+        if camera.pos[3] - s.m.special_offset[3] > next_z + 45 then
+            return
+        end
+
+        prev_z = next_z
+        local z1, z2, _, x1, x2, xo, y1, y2, yo, zi, xco = unpack(split(def))
+        if next_z < z1 and next_z >= z2 then
+            for x = x1, x2, xo do
+                for y = y1, y2, yo do
+                    for tri in all(model.triangles) do
+                        local points = {}
+                        for pi in all(tri.point_indices) do
+                            add(points, v_add(model.points[pi], {x * co, y, next_z}))
+                        end
+                        add(tris_needed, {points, tri.normal, tri.color, tri.fill})
+                    end
+                end
+            end
+            co *= xco
+            next_z -= zi
+        end
+        if prev_z == next_z then next_z -= 1 end
+    end
+    return make_sculpture(callback, 200, 96)
+end
+
+-- Old sculptures
+
 --[[
 function make_terrain_sculpture()
     local next_z = 0
@@ -107,65 +167,6 @@ function make_city_sculpture()
     return make_sculpture(callback, 200, 96)
 end
 ]]
-
-function make_models_sculpture(def)
-    local next_z = camera.pos[3]
-    local x = 1
-    local model = deserialize_model(data_models[split(def)[3]], 1, v_zero())
-    local tris_needed, fills_needed, co = {}, {}, 1
-    function callback(s)
-        if framenum % 2 == 0 then
-            if #tris_needed > 0 then
-                local points, normal, color, fill = unpack(tris_needed[1])
-                add(fills_needed, {framenum + 5, s.fn, color, fill})
-                s.add_poly(points, normal, 7, 0b0.01)
-                deli(tris_needed, 1)
-            end
-        end
-        if #fills_needed > 0 then
-            local time, index, color, fill = unpack(fills_needed[1])
-            if framenum > time then
-                local t =s.m.triangles[index]
-                t.color = color
-                t.fill = fill
-                deli(fills_needed, 1)
-            end
-        end
-
-        if beat_ticks_8 == 0 and #s.m.triangles > 0 then
-            for i = 1, 2 do
-                local ind = rnd(#s.m.triangles)\1 + 1
-                add(fills_needed, {framenum + 5, ind, -1, 0b0.01})
-                s.m.triangles[ind].color = -0x19
-            end
-        end
-
-        if camera.pos[3] - s.m.special_offset[3] > next_z + 45 then
-            return
-        end
-
-        prev_z = next_z
-        local z1, z2, _, x1, x2, xo, y1, y2, yo, zi, xco = unpack(split(def))
-        if next_z < z1 and next_z >= z2 then
-            for x = x1, x2, xo do
-                for y = y1, y2, yo do
-                    for tri in all(model.triangles) do
-                        local points = {}
-                        for pi in all(tri.point_indices) do
-                            add(points, v_add(model.points[pi], {x * co, y, next_z}))
-                        end
-                        add(tris_needed, {points, tri.normal, tri.color, tri.fill})
-                    end
-                end
-            end
-            co *= xco
-            next_z -= zi
-        end
-        if prev_z == next_z then next_z -= 1 end
-    end
-    return make_sculpture(callback, 200, 96)
-end
-
 
 --[[
 function make_billboards_sculpture()

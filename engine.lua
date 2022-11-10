@@ -1,28 +1,16 @@
------ UTIL -----
+-- 3d engine
 
-function mapfilter(l, f)
-	local res = {}
-	for item in all(l) do
-		local ret = f(item)
-		if ret != nil then add(res, ret) end
-	end
-	return res
-end
-
-function copy(l) return mapfilter(l, function(i) return i end) end
-
------ MATH -----
+-- Use "normal" sin and cos fns rather than p8's
 p8cos = cos function cos(angle) return p8cos(angle/(3.1415*2)) end
 p8sin = sin function sin(angle) return -p8sin(angle/(3.1415*2)) end
-function angledelta(a,b)
-	local delta = (b - a + 3.14159) % 6.2818 - 3.14159
-	if delta < -3.14159 then return delta + 6.2818 else return delta end
-end
+
 
 ----- VECTORS -----
 function v_add(a,b) return {a[1] + b[1], a[2] + b[2], a[3] + b[3], 1} end
 function v_sub(a,b) return {a[1] - b[1], a[2] - b[2], a[3] - b[3], 1} end
 function v_mul(a,s) return {a[1] * s, a[2] * s, a[3] * s, 1} end
+
+-- Special vector mag function which does not easily overflow on big distances
 function v_mag(v)
     local d=max(max(abs(v[1]),abs(v[2])),abs(v[3]))
     local x,y,z=v[1]/d,v[2]/d,v[3]/d
@@ -42,6 +30,8 @@ function v_zero() return {0,0,0,1} end
 
 ----- MATRICES -----
 
+-- Multiply two matrices. We want to use this function as *infrequently as possible!*
+-- To reduce tokens we unpack the vectors and avoid lots of []
 function mm4(a,b)
 	local a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16 = unpack(a)
 	local b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12,b13,b14,b15,b16 = unpack(b)
@@ -68,16 +58,20 @@ function mm4(a,b)
 	}
 end
 
+-- Matrix * Vector
 function mv4(m, v)
+	local m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16 = unpack(m)
 	local vx, vy, vz, vw = unpack(v)
 	return {
-		m[1] * vx +    m[2] * vy +    m[3] * vz +    m[4] * vw,
-		m[5] * vx +    m[6] * vy +    m[7] * vz +    m[8] * vw,
-		m[9] * vx +    m[10] * vy +   m[11] * vz +   m[12] * vw,
-		m[13] * vx +   m[14] * vy +   m[15] * vz +   m[16] * vw
+		m1 * vx +    m2 * vy +    m3 * vz +    m4 * vw,
+		m5 * vx +    m6 * vy +    m7 * vz +    m8 * vw,
+		m9 * vx +    m10 * vy +   m11 * vz +   m12 * vw,
+		m13 * vx +   m14 * vy +   m15 * vz +   m16 * vw
 	}
 end
 
+-- Create a transformation matrix from euler rotations
+-- This is done in a particular order based on the needs of the game
 function m_rot_xyz(a,b,c)
 	local sa, ca, sb, cb, sc, cc = sin(a), cos(a), sin(b), cos(b), sin(c), cos(c)
 	return {
@@ -88,6 +82,7 @@ function m_rot_xyz(a,b,c)
 	}
 end
 
+-- Transformation matrix from fwd and up vectors
 function m_look(fwd, up)
 	local left = v_norm(v_cross(up, fwd))
 	local new_up = v_norm(v_cross(fwd, left))
@@ -99,6 +94,7 @@ function m_look(fwd, up)
 	}
 end
 
+-- Perspective transform
 function m_perspective(near, far, width, height)
 	return {
 		(2 - near) / width, 0, 0, 0,
@@ -109,16 +105,12 @@ function m_perspective(near, far, width, height)
 end
 
 function m_identity()
-	local m = {
-		1,0,0,0,
-		0,1,0,0,
-		0,0,1,0,
-		0,0,0,1
-	}
+	local m = split"1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1"
 	m.is_identity = true
 	return m
 end
 
+-- Stolen from the BBS somewhere...
 function polyfill(p,col)
 	color(col)
 	local p0,nodes=p[#p],{}
@@ -149,8 +141,10 @@ end
 
 ----- 3D -----
 
+-- Clip a list of points at the close Z plane
+-- This is based on a common algorithm but with the other 5 planes
+-- removed beacuse they're not very important to clip and it's expensive.
 function geo_clip(points)
-
 	local new_points = {}	
 	for i = 1, #points do
 		local s,e = points[i], points[i % #points + 1]
@@ -176,23 +170,28 @@ end
 gray = split"0,5,13,6,10,7,7"
 distance_colors = split"7,10,9,4,2"
 
+-- Necessary sometimes to do a one-off transformation of a point to get its
+-- 2d position
 function transform_point_slow(camera, point)
 	local hp = mv4(frame_matrix, v_sub(point, camera.pos))
 	return {hp[1] / hp[4] * 64 + 64, hp[2] / hp[4] * 64 + 64, 0, 1}
 end
 
+-- Big ol render function which wants a list of models, sprites,
+-- a camera definition, screen width and height, a callback for drawing
+-- the skybox, and a field of view value
 function render(models, sprites, camera, w, h, draw_skybox, fov)
 	local hw, hh, nbins, znear, zfar, fv = w\2,h\2,512,-0.5,90,3.2 * (fov / 90)
+	--local up = v_norm({sin(framenum / 30) / 25,1,0,1})
 	local m = mm4(m_perspective(znear, -zfar, fv, fv), m_look(camera.fwd, {0,1,0,1}))
 	frame_matrix = m
-	local tris, drawn_tris, zbins = 0,0, {}
+	local tris, zbins = 0, {}
 	for i = 1,nbins do add(zbins, {}) end
 
 	local m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16 = unpack(m)
 	local cpx, cpy, cpz = camera.pos[1], camera.pos[2], camera.pos[3]
 
 	local reject = false
-	local within, without, clipped, rejected = 0,0,0,0
 
 	local sundir = v_norm({-0.33,1,0.13,1})
 
@@ -213,12 +212,11 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 			local dirx, diry, dirz = t.center[1] - cpx + spx, t.center[2] - cpy + spy, t.center[3] - cpz + spz
 			local dot = dirx * norm[1] + diry * norm[2] + dirz * norm[3]   
 			reject = dirz > 6
-			rejected += reject == true and 1 or 0
 			if not reject and (t.skip_cull or dot < 0 or model.special_rotation) then
 				tp = {}
 				homp = {}
 				local all_within = true
-				local all_without = true				
+				local all_without = true		
 				for i = 1,#indices do
 					local index = indices[i]
 					local cached = homog_points[index]
@@ -240,28 +238,24 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 					all_without = all_without and not homp[i][5]
 				end
 				if not reject then
-					if all_within then
-						within += 1
-					elseif all_without then
-						without += 1
-					else
-						clipped += 1
+					if not all_within and not all_without then
 						homp = geo_clip(homp)
 					end
 					if not all_without and #homp > 2 then
+						local minz = 1
 						for i = 1, #homp do
 							local pt = homp[i]
 							homp[i] = {pt[1] / pt[4] * (hw+1) + hw - 0.5, pt[2] / pt[4] * (hh+1) + hh - 0.5, pt[3] / pt[4]}
+							minz = min(homp[i][3], minz)
 						end
+						t.min_dist = minz
 						local distsq = dirx * dirx + diry * diry + dirz * dirz
-						--local bin = nbins - flr(distsq / (zfar * zfar) * nbins + 1)
 						local bin = nbins - flr(sqrt(distsq) / zfar * nbins + 1)
 						add(zbins[bin], {
 							1,
 							homp,
 							t
 						})
-						drawn_tris += 1
 					end
 				end
 			end
@@ -301,7 +295,6 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 	h2d[2] = h2d[2] / h2d[4]
 	draw_skybox(h2d[1] * hw + hw, h2d[2] * hh + hh)
 
-	time1 = stat(1)
 	for bin = 1, nbins do   
 		local contents = zbins[bin]
 		for j = 1, #contents do
@@ -321,6 +314,7 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 					c2 = c % 16
 				end
 				
+				local too_close = o.min_dist < 0.6
 
 				if o.color < 0 then
 					local vd = mid((v_dot(norm, sundir) + 0.5) * 5, 1, 7)
@@ -328,12 +322,12 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 					c2 = c % 16
 					fill = fill | 0b0101101001011010.01
 				end
-				if o.fill != 0 then
+				if o.fill != 0 and not too_close then
 					--color(c1)
 					fillp(o.fill | fill)
 					polyfill(points, c1)
 				end
-				if o.fill == 0 or abs(c) > 15 then
+				if o.fill == 0 or abs(c) > 15 or too_close then
 					color(c2)
 					-- Wireframe
 					fillp()
@@ -348,7 +342,6 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 			
 		end
 	end
-	--printh("triangle time: " .. stat(1) - time1)
 	
 end
 

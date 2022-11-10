@@ -1,7 +1,3 @@
---[[ possible ent features
-missile firing
-]]
-
 --[[
     reveal_t
     reveal_co
@@ -14,14 +10,14 @@ missile firing
     homing_ratio
 ]]
 
-function make_entities_map()
+function make_entities_map(start, end_index)
     data = {}
     for i = 0, 2047 do
         val = mget(i % 128, i \ 128)
         add(data, val \ 16)
         add(data, val % 16)
     end
-    cur = 1
+    cur = start
     function unpack_nibs(nibbles, mul, positive)
         local val = positive and 0 or ((-1 << ((nibbles * 4) - 1)) + 1)
         for j = 1, nibbles do
@@ -48,7 +44,7 @@ function make_entities_map()
         return props
     end
     local last_args2
-    while data[cur] != 15 do
+    while cur < end_index do
         local args1, args2 = pack(
             data_models[unpack_nibs(2,1, true) + 1], -- model
             {unpack_nibs(2, 0.25), unpack_nibs(2, 0.25), -unpack_nibs(4, 0.125, true) - 40} -- pos
@@ -106,7 +102,7 @@ function make_entity(model_str, pos, path_str, path_scale, movement_speed, dance
     end
     e.props.finish_time = e.props.finish_time or 1
     local starting_health = #target_points
-    obj_defaults(e, "key_started=true;active=false;time=0;t=0;t2=0;alive=true;dying=false;death_time=0;hit_time=0;in_range=false;in_range_time=0;time_till_delete=10")
+    populate_table(e, "key_started=true;active=false;time=0;t=0;t2=0;alive=true;dying=false;death_time=0;hit_time=0;in_range=false;in_range_time=0;time_till_delete=10")
     for n, pti in pairs(target_points) do
         local s = sprite(model.points[pti], function(self, x, y, size)
             local time_alive = -((e.props.reveal_t or 0) + n * (e.props.reveal_co or 0) - e.time / 30)
@@ -124,6 +120,10 @@ function make_entity(model_str, pos, path_str, path_scale, movement_speed, dance
             c2 = framenum % 2 == 0 and 12 or 7
             ovalfill(x - s1, y - s1, x + s1, y + s1, self.targeted and c2 or 7)
             oval(x - s2, y - s2, x + s2, y + s2, self.targeted and c2 or 8)
+            if self.targeted then
+                local s8 = mid(size * 25, 4, 20)
+                rect(x - s8, y - s8, x + s8, y + s8, c2)
+            end
             -- If just appeared then we want a targeting reticle
             if time_alive < 1 and ((time_alive * 16 \ 1) % 2 == 0 or time_alive < 0.25) then
                 local d1 = max(50 - time_alive * 150, 6)
@@ -161,6 +161,11 @@ function make_entity(model_str, pos, path_str, path_scale, movement_speed, dance
         end
     end
 
+--[[    add(model.sprites, sprite(model.pos, function(self, x, y, size)
+        spr(e.indicator, x, y)
+    end))
+    ]]
+
     add(entities, e)
     return e
 end
@@ -178,9 +183,11 @@ function entities_in_range()
 end
 
 function update_entities(beat_num)
+    --local t1 = stat(1)
     local order = {1,3,2}
     local beat_bit = 1 << (15 - beat_num\2)
     for en,e in pairs(entities_in_range()) do
+        --e.indicator = 49
         e.time += 1
         -- Only move if the dance bit for this beat is set!
         -- Or, we also move when we're hit
@@ -258,6 +265,7 @@ function update_entities(beat_num)
                     update_rot = true
                 end
                 if update_pos and not update_rot then
+                    --e.indicator = 50
                     local delta = v_sub(m.pos, old_pos)
                     for i = 1, #m.points do
                         m.points[i][1] = m.points[i][1] + delta[1]
@@ -268,7 +276,7 @@ function update_entities(beat_num)
                         tri.center = v_add(tri.center, delta)
                     end
                 else
-                    --printh("UPDATE POINTS")
+                    --e.indicator = 51
                     m.update_points()
                 end       
             end
@@ -299,4 +307,5 @@ function update_entities(beat_num)
             end
         end
     end
+    --printh(stat(1) - t1)
 end

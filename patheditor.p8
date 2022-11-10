@@ -4,6 +4,8 @@ __lua__
 -- lorez2-patheditor
 -- by morganquirk
 
+-- Not really useful anymore. I just manually write out the paths
+
 #include engine.lua
 #include debug.lua
 #include patheditor.lua

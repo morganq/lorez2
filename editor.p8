@@ -3,6 +3,7 @@ version 36
 __lua__
 -- lorez2-editor
 -- by morganquirk
+-- Mostly useless model viewer
 
 #include data.lua
 #include engine.lua

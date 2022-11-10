@@ -1,3 +1,4 @@
+-- Mostly useless model viewer
 
 function _init()
 	models = {}

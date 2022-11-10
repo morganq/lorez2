@@ -1,6 +1,9 @@
---[[
-reference values on z
-]]
+-- Not really useful anymore. I just manually write out the paths
+
+function angledelta(a,b)
+	local delta = (b - a + 3.14159) % 6.2818 - 3.14159
+	if delta < -3.14159 then return delta + 6.2818 else return delta end
+end
 
 function _init()
     pobj = {

@@ -75,6 +75,7 @@ def compress(line):
     return ret
 
 out = ""
+map_start_index = 1
 with open("level.txt") as f:
     s = ""
     for line in f:
@@ -86,7 +87,7 @@ with open("level.txt") as f:
             cline = compress(line.strip())
             print(cline)
             s += cline
-    s += "f"
+    map_start_index += len(s)
     s = s.ljust(8192, "f")
     for i in range(32):
         out += s[i * 256:(i + 1) * 256] + "\n"
@@ -103,5 +104,10 @@ with open("lorez2_base.p8") as fi:
                 in_map = False
             if not in_map:
                 fo.write(line)
+    with open("map_meta.lua", "w") as fo:
+        n1 = map_start_index
+        n2 = 9000
+        n3 = 8000
+        fo.write("map_indices = split\"%s,%s,%s,%s\"" % (1, n1, n2, n3))
 
 os.system("python3 ~/Downloads/shrinko8-main/shrinko8.py lorez2.p8 lorez2-min.p8 --minify --preserve \"*.*\"")
