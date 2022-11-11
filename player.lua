@@ -3,7 +3,8 @@
 function target_in_crosshair(ent, pti, spr)
     -- Can't select more than 8 enemies, can't re-select a targeted one, and need a bit of time between selections.
 	if btn(5) and #player.selected_targets < 8 and not spr.targeted and player.last_target_time > 3 then
-        qsfx(16, 2, rnd(3)\1 * 8, 8)
+        --qsfx(16, 2, rnd(3)\1 * 8, 8)
+        sfx_beat"188,51"
         add(player.selected_targets, {ent, pti, spr})
         player.last_target_time = 0
         spr.targeted = true
@@ -33,6 +34,9 @@ function player_spawn()
     end    
 end
 
+beeps = split"1,2,3,5,6,7,8,10"
+notes = split"96,97,98,99,96,97,98,99"
+
 --poke(0x5F2D, 0x4 | 0x1)
 function player_update()
     player.health=4
@@ -46,13 +50,18 @@ function player_update()
     end
 
     player.lerp_focus = v_add(v_mul(player.lerp_focus, 0.9), v_mul(player.focus, 0.1))
+    if v_mag(v_sub(player.focus, player.lerp_focus)) > 0.1 then
+        player.cursor[1] *= 0.9
+        player.cursor[2] *= 0.9
+    end
 	player.cursor_fwd = mv4(m_rot_xyz(player.cursor[2] + player.lerp_focus[2], player.cursor[1] + player.lerp_focus[1], 0), {0,0,-1,1})
 	camera.fwd = v_add(v_mul(camera.fwd, 0.85), v_mul(player.cursor_fwd, 0.15))
     
     if (not btn(5)) and #player.selected_targets > 0 then
-        qsfx(19, 2, beat_num % 16, #player.selected_targets)
         for i,t in pairs(player.selected_targets) do
-            make_laser(t[2], t[3], t[1], (i-1) * -0.6)
+            sfx_beat(notes[i] .. ",0b01011000", function()
+                make_laser(t[2], t[3], t[1], 0)
+            end, beeps[i])
         end
         score += 2 ^ #player.selected_targets
         player.selected_targets = {}
@@ -60,9 +69,8 @@ function player_update()
     
     camera.pos = v_add(camera.pos, {0,0,-player.speed / (player.die_time + 1)})
     if player.launching then player.launch_time += 1 end
-    player.pos = v_add(camera.pos, {0,-2.5, max(-3.55, -0.5 + framenum / -15) - player.cursor[2] / 2 + sin(beat_ticks_8 / 4 - 1.2) ^ 8 * 0.125 - player.launch_time / 4 })
-    --player.pos = v_add(camera.pos, {0,-2.5, max(-3.55, -0.5 + framenum / -15) - player.cursor[2] / 2 - player.launch_time / 4 -beat_ticks_8 / 50 })
-    --beat_ticks_8 / 50
+    --player.pos = v_add(camera.pos, {0,-2.5, max(-3.55, -0.5 + framenum / -35) - player.cursor[2] / 2 + sin(beat_ticks_8 / 4 - 1.2) ^ 8 * 0.125 - player.launch_time / 4 })
+    player.pos = v_add(camera.pos, {0, -2.5, smooth(min(framenum/35,1)) * -3 - player.launch_time / 4 + smooth(beat_ticks_8 / 8, 3) / 4 - player.cursor[2] * 2 })
     
     player.theta = player.theta * 0.95 + (player.cursor[1]) * 0.05
     local theta = player.theta
@@ -92,7 +100,7 @@ function player_update()
         end
         shake = sin(player.flip_time * 50) * 0.25
         local flip = 1 - (1 - player.flip_time) ^ 2
-        pm.rotation = m_rot_xyz(cos(flip * 3.14159) * -0.5 * 6.2818 + 3.14159, 0, 0)
+        pm.rotation = m_rot_xyz(smooth(flip) * 6.2818, 0, 0)
         pm.update_points()
     end
     pm.special_rotation = m_rot_xyz(0,theta * 0.75,0)
@@ -111,7 +119,6 @@ function make_laser(pti, target_spr, ent,t)
     local jl = {
         points = {},
         lines = {},
-        fired = false,
         t = t,
     }
     for i = 1, 3 do
@@ -124,41 +131,35 @@ function make_laser(pti, target_spr, ent,t)
     end)
     add(sprites, circle)
     jl.update = function()
-        
+        jl.t += 0.2
         local a = v_add(player.pos, off)
         circle.pos = a
         jl.points[1] = a
         local b = to
         for i = 1,3 do
             jl.lines[i].s1.pos = a
-            jl.lines[i].s2.pos = a
         end
-        if jl.fired then
-            jl.t += 0.2
-            for i = 2,4 do
-                local xo = (b[order[i]] - a[order[i]]) * mid(jl.t - (i - 2),0,1)
-                jl.points[i] = {
-                    jl.points[i - 1][1],
-                    jl.points[i - 1][2],
-                    jl.points[i - 1][3],
-                    1
-                }
-                jl.points[i][order[i]] += xo
-                
-                jl.lines[i - 1].s2.pos = jl.points[i]
-                jl.lines[i - 1].rad = 3
-                if i < 4 then
-                    jl.lines[i].s1.pos = jl.points[i]
-                end
+        for i = 2,4 do
+            local xo = (b[order[i]] - a[order[i]]) * mid(jl.t - (i - 2),0,1)
+            jl.points[i] = {
+                jl.points[i - 1][1],
+                jl.points[i - 1][2],
+                jl.points[i - 1][3],
+                1
+            }
+            jl.points[i][order[i]] += xo
+            
+            jl.lines[i - 1].s2.pos = jl.points[i]
+            jl.lines[i - 1].rad = 3
+            if i < 4 then
+                jl.lines[i].s1.pos = jl.points[i]
             end
-          
         end
-        if not jl.fired and beat_frame then
-            jl.fired = true
-        end
+        
+
         if jl.t > 3 and jl.t - 0.2 <= 3 then
             ent.take_damage(pti, target_spr)
-            qsfx(18, nil, rnd(8)\1 * 3, 3)
+            --qsfx(18, nil, rnd(8)\1 * 3, 3)
         end
         if jl.t > 8 then
             del(lasers, jl)

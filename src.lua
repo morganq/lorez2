@@ -3,37 +3,53 @@
 -- themes: land sea air? - mastery + control over nature, contradiction and conflict
 -- land: key: seed, tree (fires missiles), wheel, 
 -- sea: key: sail. swarms? coral, jellyfish, boats, rig
--- air: key: gear. propeller. bombs.
-
-function qsfx(ind, channel, offset, length) add(sound_queue, {ind, channel, offset, length}) end
+-- air:
+--[[
+	gear (can put multiple together to rotate+mesh)
+	cloud (verts and sprites)
+	helicopter thing?
+	spheres
+]]--
 
 cartdata("lorez2")
 stage_names = split"cel [tyrant],nethuns [monarch],tin [magnate]"
+stage_fills=split("0b0,0b1101000001110000.1,0b0,0b0,0b0;0b0,0b1111011010011111.1,0b0,0b0,0b0;0b0,0b1101100011011111.1,0b0,0b0,0b0;0b0,0b0111101111011110.1,0b0,0b0,0b0",";")
+stage_palettes=split("130,142,3,136,141,6,7,8,9,10,11,12,13,14,15,0;1,12,3,136,131,6,7,8,9,10,11,12,13,14,15,129;130,142,3,136,141,6,7,8,9,10,11,12,13,14,15,0;6,13,3,4,13,6,0,8,9,10,11,12,1,14,15,7",";")
+
+local sfx_pattern_mem = 0x3200 + 68 * 8
+
+function sfx_beat(bstring, callback, off)
+    local n = (current_pattern_n + (off or 1)) % 32
+    poke(sfx_pattern_mem + n * 2, unpack(split(bstring)))
+    add(sfx_callback_table[n], callback)
+end
+
 poke(0X5F5C, 255)
 function _init()
-	--make_entities_map()
 	camera = {
 		pos=v_zero(),
 		angles=v_zero(),
 		fwd={0,0,-1,1},
 	}
-	focuses = {}
+	focuses, sfx_callback_table = {}, {}
 	sprites, entities, sculptures, lasers, score = {}, {}, {}, {}, 0
+	cur_stage = 4
 
 	player_spawn()
 	player.cursor, player.speed = split"0.55,-0.25", 0
 	framenum, last_tick, selected_stage, game_started, level_keys = 0, 0, 1, false, {}
 	
-	beat_frame, beat_num, beat_ticks_16, beat_ticks_8, beat_ticks_4 = false, 0, 0, 0, 0
+	beat_frame, beat_num, beat_ticks_16, beat_ticks_8, beat_ticks_4, last_beat_num = false, 0, 0, 0, 0, 0
 	_update, _draw = _title_update, _title_draw
 	set_stage(1)
 end
 
 function start()
+	cur_stage = selected_stage
 	was_pressed = false
 	player_spawn()
+	for i = 0, 31 do sfx_callback_table[i] = {} end
 	
-	sound_queue = {}
 	_update, _draw = _game_update, _game_draw
 	-- z1, z2, model, x1, x2, xo, y1, y2, yo, zi, xco
 	--sculptures = {make_models_sculpture("0,-90,s_curb,-4,4,8,-3,-3,1,8,1")}
@@ -50,7 +66,8 @@ function start()
 	--sculptures = {make_models_sculpture("0,-90,s_column,-12,12,24,2,2,1,12,1")}
 	--sculptures = {make_models_sculpture("0,-90,s_hex,-2,-2,1,-3,-3,1,6,-1")}
 	framenum, game_started, title_model = 0, true, nil
-	make_entities_map(map_indices[selected_stage], map_indices[selected_stage + 1])
+	make_entities_map(map_indices[selected_stage] + 1, map_indices[selected_stage + 1])
+	--make_entities_map(1, 2101)
 	pal()	
 	camera.fwd = split"0,0,-1"
 end
@@ -64,7 +81,6 @@ end
 
 function _title_draw()
 	cls(7)
-	pal(split"6,13,3,4,13,6,0,8,9,10,11,12,1,14,15,7",1)
 	draw_game()
 	--clip(0,0,128,framenum * 4)
 	if not player.launching then
@@ -80,6 +96,7 @@ function _title_draw()
 			?ps .. "\n" 
 		end
 	end
+	pal(split(stage_palettes[cur_stage]), 1)
 end
 
 function _title_update()
@@ -106,20 +123,16 @@ end
 
 function _game_update()
 	framenum += 1
+	current_pattern_n = stat(53)
 
 	if btnp(5) then sfx(17,2,0,3); was_pressed = true end
 	if not btn(5) and was_pressed then was_pressed = false; sfx(17,2,4,3) end
 
-	if btn(4) then
+	--if btn(4) then
 		--for e in all(entities) do 
 		--	if e.time > 0 then e.dying = true end
 		--end
-	end
-	if btnp(4) then
-		local n = stat(53) + 1
-		poke(0x3200 + 68 * 8 + n * 2, 188)
-		poke(0x3201 + 68 * 8 + n * 2, 51)
-	end
+	--end
 	--player.speed = 0.025 + (btn(4) and 1 or 0)
 
 	player_update()
@@ -133,15 +146,20 @@ function _game_update()
 		end
 	end
 
+    if current_pattern_n != last_beat_num then
+        for cb in all(sfx_callback_table[current_pattern_n]) do
+            cb()
+        end
+        poke(sfx_pattern_mem + last_beat_num * 2, 0, 0)
+        sfx_callback_table[last_beat_num] = {}
+		last_beat_num = current_pattern_n
+    end	
+
 	beat_ticks_16 += 1
 	beat_ticks_8 += 1
 	beat_ticks_4 += 1
 	local tick = stat(56) / 15 + 0.25 --* 16 / 480
 	if tick % 1 < last_tick % 1 then
-		while #sound_queue > 0 do
-			sfx(unpack(sound_queue[1]))
-			deli(sound_queue, 1)
-		end
 		beat_num = (beat_num + 1) % 32
 		if beat_num % 2 == 0 then
 			beat_ticks_16 = 0
@@ -177,9 +195,7 @@ end
 
 function draw_skybox(x,y)
 	cls(0)
-	--local cols, fills = split"1,5,1,5", split"0b0,0b1111000011110000.1,0b0,0b0,0b0"
-	local cols, fills = split"1,5,1,5", split"0b0,0b1101000001110000.1,0b0,0b0,0b0"
-	--local cols, fills = split"1,5,1,5", split"0b0,0b1111101101011011.1,0b0,0b0,0b0"
+	local cols, fills = split"1,5,1,5", split(stage_fills[cur_stage])
 	for i = 1, 4 do
 		fillp(fills[i])
 		circfill(x, y, 160 / (i + 1) + sin(beat_ticks_4 / 8) ^ 9 * 3, cols[i])
@@ -187,18 +203,14 @@ function draw_skybox(x,y)
 		local rad = 150 - i * 30
 		circ(x, y, rad, 1)
 	end
-	--line(0, y, 128, y, 1)
 	for i = 1,4 do
 		local co = 1 + i / 5
 		circ(64 - (64 - x) * co, 64 - (64 - y) * co, 1 + i * 4, 1)
 	end	
 	for i = 1, 100 do
-		local a, r = sin(i * 160.37) * 50, sin(i * 190) * 150
+		local a, r = sin(i * 140.37) * 50, sin(i * 190) * 150
 		circfill(x + sin(a) * r, y + cos(a) * r, abs(sin(a) * 1.15), 2)
 	end
-	--fillp(0b0000111100001111.1)
-
-	--fillp()
 
 	if player.dying or player.launching then
 		circfill(x, y, (player.die_time + player.launch_time) * 2, 0)
@@ -228,7 +240,6 @@ function draw_game()
 		add(models, s)
 	end
 
-	--local time1 = stat(1)
 	render(models, frame_sprites, camera, 128, 128, draw_skybox, min(70 + player.launch_time,180))
 end
 
@@ -264,9 +275,7 @@ function _game_draw()
 		end
 		pal()
 	end
-
-	--pal({[1]=130, [5]=141, [10]=135, [4]=136}, 1)
-	pal(split"130,142,3,136,141,6,7,8,9,10,11,12,13,14,15,0", 1)
+	
 	if player.dying and player.die_time > 30 then
 		local w = mid((player.die_time - 30) * 2, 0, 64)
 		local w2 = cos(w / 64 * 3.14159) * -32 + 32
@@ -286,15 +295,9 @@ function _game_draw()
 	?"-" .. score .. "-", 64 - #tostr(score)*2 - 2, 2,7
 
 	if player.launching then
-		?sub(stage_names[selected_stage] .. "\nhas been captured\n⁘ virus neutralized ⁘\nyou have reached\nthe end of this\nsub-system\n\n\^w\^tstage ".. selected_stage .." log out",0,player.launch_time\1.5) .. "■", 4, 40 - min((player.launch_time \ 30),4) * 6,10
+		?sub(stage_names[cur_stage] .. "\nhas been captured\n⁘ virus neutralized ⁘\nyou have reached\nthe end of this\nsub-system\n\n\^w\^tstage ".. cur_stage .." log out",0,player.launch_time\1.5) .. "■", 4, 40 - min((player.launch_time \ 30),4) * 6,10
 	end
 
-	--?camera.pos[3]\1,114,110,7
-	--?framenum\30,114,120,7
-	
-
-	-- waterify
-	--pal(split"140,2,3,4,12,6,7,8,9,10,7,11,13,14,15,1",1)
-
 	--print(stat(56) / 15, 1, 1, 7)
+	pal(split(stage_palettes[cur_stage]), 1)
 end

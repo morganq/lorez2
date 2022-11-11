@@ -34,7 +34,7 @@ function make_entities_map(start, end_index)
         end
         return targets
     end
-    local prop_table = split"reveal_t,reveal_co,one_at_a_time,finish_time,fixed_angle,scale,x_co,y_co,z_co,score_mul,heal,homing_ratio,set_key,start_key"
+    local prop_table = split"reveal_t,reveal_co,one_at_a_time,finish_time,fixed_angle,scale,x_co,y_co,z_co,score_mul,heal,homing_ratio,set_key,start_key,target_360"
     function unpack_props()
         len = unpack_nibs(1,1,true)
         local props = {}
@@ -110,10 +110,7 @@ function make_entity(model_str, pos, path_str, path_scale, movement_speed, dance
 
             local s1, s2 = size * 4 + 1, size * 2 + 1
 
-            --local center_delta = v_sub(self.pos, e.model.pos)
-            --local dot = v_dot(v_norm({center_delta[1],0,center_delta[3]}), {0,0,-1})
-            if self.pos[3] < e.model.pos[3] and not self.targeted then
-                --ovalfill(x - 1, y - 1, x + 1, y + 1, 5)
+            if self.pos[3] < e.model.pos[3] and not self.targeted and not e.props.target_360 then
                 return
             end
 
@@ -160,11 +157,6 @@ function make_entity(model_str, pos, path_str, path_scale, movement_speed, dance
             make_splash(v_add(model.pos, {0,0,0}))
         end
     end
-
---[[    add(model.sprites, sprite(model.pos, function(self, x, y, size)
-        spr(e.indicator, x, y)
-    end))
-    ]]
 
     add(entities, e)
     return e

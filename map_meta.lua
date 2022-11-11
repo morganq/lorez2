@@ -1,1 +1,1 @@
-map_indices = split"1,2101,9000,8000"
+map_indices = split"0,2100,2137,2174"
