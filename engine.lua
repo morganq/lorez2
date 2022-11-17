@@ -248,7 +248,7 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 							homp[i] = {pt[1] / pt[4] * (hw+1) + hw - 0.5, pt[2] / pt[4] * (hh+1) + hh - 0.5, pt[3] / pt[4]}
 							minz = min(homp[i][3], minz)
 						end
-						t.min_dist = minz
+						t.min_dist = minz + (abs(t.center[1]) + abs(t.center[2])) / 3
 						local distsq = dirx * dirx + diry * diry + dirz * dirz
 						local bin = nbins - flr(sqrt(distsq) / zfar * nbins + 1)
 						add(zbins[bin], {
@@ -314,7 +314,7 @@ function render(models, sprites, camera, w, h, draw_skybox, fov)
 					c2 = c % 16
 				end
 				
-				local too_close = o.min_dist < 0.6
+				local too_close = o.min_dist < 0.8
 
 				if o.color < 0 then
 					local vd = mid((v_dot(norm, sundir) + 0.5) * 5, 1, 7)

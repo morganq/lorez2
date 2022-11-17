@@ -51,8 +51,8 @@ function player_update()
 
     player.lerp_focus = v_add(v_mul(player.lerp_focus, 0.9), v_mul(player.focus, 0.1))
     if v_mag(v_sub(player.focus, player.lerp_focus)) > 0.1 then
-        player.cursor[1] *= 0.9
-        player.cursor[2] *= 0.9
+        player.cursor[1] *= 0.8
+        player.cursor[2] *= 0.8
     end
 	player.cursor_fwd = mv4(m_rot_xyz(player.cursor[2] + player.lerp_focus[2], player.cursor[1] + player.lerp_focus[1], 0), {0,0,-1,1})
 	camera.fwd = v_add(v_mul(camera.fwd, 0.85), v_mul(player.cursor_fwd, 0.15))

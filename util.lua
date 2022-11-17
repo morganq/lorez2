@@ -20,11 +20,11 @@ function v2s(v)
 end
 
 function fourway()
-	local parts, i = {{-1,0},{0,-1},{1,0},{0,1}}, 0
+	local parts, i = split"_,-1,0,0,-1,1,0,0,1", 0
 	return function()
 		if i < 4 then
-			i+=1
-			return parts[i][1], parts[i][2]
+			i+=2
+			return parts[i], parts[i+1]
 		end
 	end
 end

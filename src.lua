@@ -128,12 +128,12 @@ function _game_update()
 	if btnp(5) then sfx(17,2,0,3); was_pressed = true end
 	if not btn(5) and was_pressed then was_pressed = false; sfx(17,2,4,3) end
 
-	--if btn(4) then
-		--for e in all(entities) do 
-		--	if e.time > 0 then e.dying = true end
-		--end
-	--end
-	--player.speed = 0.025 + (btn(4) and 1 or 0)
+	if btn(4) then
+		for e in all(entities) do 
+			if e.time > 0 then e.dying = true end
+		end
+	end
+	player.speed = 0.025 + (btn(4) and 1 or 0)
 
 	player_update()
 	foreach(lasers, function(l) l.update() end)
@@ -234,10 +234,9 @@ function draw_game()
 		add(models, player.model)
 	end
 	for s in all(sculptures) do
-		if not player.dying then
-			s.compute()
+		for sm in all(s()) do
+			add(models, sm)
 		end
-		add(models, s)
 	end
 
 	render(models, frame_sprites, camera, 128, 128, draw_skybox, min(70 + player.launch_time,180))
